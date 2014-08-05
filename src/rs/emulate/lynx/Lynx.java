@@ -12,6 +12,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Map;
@@ -203,7 +204,7 @@ public final class Lynx {
 				Files.createDirectories(clazz.getParent());
 			}
 
-			try (FileOutputStream os = new FileOutputStream(clazz.toFile()); FileChannel channel = os.getChannel()) {
+			try (FileChannel channel = FileChannel.open(clazz, StandardOpenOption.WRITE)) {
 				ByteBuffer buffer = entry.getValue();
 				channel.write(buffer);
 			} catch (IOException e) {
@@ -225,11 +226,11 @@ public final class Lynx {
 		Path jar = directory.resolve(name);
 
 		try (JarOutputStream jos = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(jar.toFile())))) {
-			for (Entry<String, ByteBuffer> clazz : classes.entrySet()) {
-				ZipEntry zip = new ZipEntry(clazz.getKey());
+			for (Entry<String, ByteBuffer> entry : classes.entrySet()) {
+				ZipEntry zip = new ZipEntry(entry.getKey());
 
 				jos.putNextEntry(zip);
-				jos.write(clazz.getValue().array());
+				jos.write(entry.getValue().array());
 			}
 		} catch (IOException e) {
 			System.err.println("Error writing classes to jar - please ensure this program has write permissions.");
