@@ -21,7 +21,7 @@ public final class Js5Constants {
 	/**
 	 * The major version (i.e. client version).
 	 */
-	public static final int MAJOR_VERSION = 814;
+	public static final int MAJOR_VERSION = 816;
 
 	/**
 	 * The minor version.
