@@ -29,9 +29,9 @@ public final class ClientVersionWorker implements Closeable {
 	private enum HandshakeResponse {
 
 		/**
-		 * The outdated handshake response, when the major or minor version is incorrect.
+		 * The invalid handshake response, when the major or minor version is incorrect.
 		 */
-		OUTDATED,
+		INVALID,
 
 		/**
 		 * The unknown handshake response.
@@ -54,7 +54,7 @@ public final class ClientVersionWorker implements Closeable {
 			case 0:
 				return VALID;
 			case 6:
-				return OUTDATED;
+				return INVALID;
 			}
 			return UNKNOWN;
 		}
@@ -159,7 +159,8 @@ public final class ClientVersionWorker implements Closeable {
 	}
 
 	/**
-	 * Identifies the current runescape client version.
+	 * Identifies the current runescape client version, making {@link Js5Constants#DEFAULT_ATTEMPT_COUNT} attempts
+	 * before stopping.
 	 * 
 	 * @return The version.
 	 * @throws IOException If there is an error reading from the input stream.
@@ -189,7 +190,7 @@ public final class ClientVersionWorker implements Closeable {
 				case VALID:
 					System.out.println("Successfully identified client version " + major + ".");
 					return major;
-				case OUTDATED:
+				case INVALID:
 					state = State.OUTDATED;
 					System.out.println("Invalid client version " + major + ", trying again.");
 					break; // Will fall through to the OUTDATED case below.
