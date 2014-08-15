@@ -204,7 +204,7 @@ public final class Lynx {
 				Files.createDirectories(clazz.getParent());
 			}
 
-			try (FileChannel channel = FileChannel.open(clazz, StandardOpenOption.WRITE)) {
+			try (FileChannel channel = FileChannel.open(clazz, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
 				ByteBuffer buffer = entry.getValue();
 				channel.write(buffer);
 			} catch (IOException e) {
