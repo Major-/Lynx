@@ -11,9 +11,14 @@ import java.nio.file.Paths;
 public final class LynxConstants {
 
 	/**
+	 * The id of the world the applet should use.
+	 */
+	public static final int APPLET_ID = 2;
+
+	/**
 	 * The URL to the page containing the game applet.
 	 */
-	public static final String APPLET_URL = "http://world1.runescape.com/g=runescape/";
+	public static final String APPLET_URL = "http://world" + APPLET_ID + ".runescape.com/g=runescape/";
 
 	/**
 	 * The size of the buffer used when decrypting the {@code inner.pack.gz} archive, in bytes.

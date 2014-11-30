@@ -87,8 +87,7 @@ public final class Lynx {
 			}
 
 		} catch (IOException e) {
-			System.err.println("Error retrieving gamepack - please report along with the below stack trace:");
-			throw new IOException(e);
+			throw new IOException("Error retrieving gamepack - please report.", e);
 		}
 
 		return gamepack;
@@ -107,6 +106,7 @@ public final class Lynx {
 				return value;
 			}
 		}
+
 		throw new IllegalStateException("Parameters did not contain the connection key - please report.");
 	}
 
@@ -122,8 +122,7 @@ public final class Lynx {
 			worker.connect(Js5Constants.MAJOR_VERSION, Js5Constants.MINOR_VERSION);
 			return worker.identifyVersion();
 		} catch (IOException e) {
-			System.err.println("Error identifying the correct version - please report:");
-			throw new IOException(e);
+			throw new IOException("Error identifying the correct version - please report.", e);
 		}
 	}
 
@@ -169,12 +168,10 @@ public final class Lynx {
 
 		Map<String, ByteBuffer> classes;
 
-		// Decrypt and decompress the inner pack.
 		try (InnerPackDecrypter decrypter = new InnerPackDecrypter(gamepack, secret, vector)) {
 			classes = decrypter.decrypt();
 		} catch (GeneralSecurityException e) {
-			System.out.println("Error decrypting the inner archive - please report:");
-			throw new IllegalStateException(e);
+			throw new IllegalStateException("Error decrypting the inner archive - please report.", e);
 		}
 
 		Path client = directory.resolve("bin");
@@ -198,18 +195,17 @@ public final class Lynx {
 	private void writeClasses(Map<String, ByteBuffer> classes, Path directory) throws IOException {
 		for (Entry<String, ByteBuffer> entry : classes.entrySet()) {
 			String name = entry.getKey();
-			Path clazz = directory.resolve(name);
+			Path path = directory.resolve(name);
 
 			if (name.contains("/")) {
-				Files.createDirectories(clazz.getParent());
+				Files.createDirectories(path.getParent());
 			}
 
-			try (FileChannel channel = FileChannel.open(clazz, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
+			try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
 				ByteBuffer buffer = entry.getValue();
 				channel.write(buffer);
 			} catch (IOException e) {
-				System.err.println("Error writing classes to file - please ensure this program has write permissions.");
-				throw new IOException(e);
+				throw new IOException("Error writing classes to file - please ensure this program has write permissions.", e);
 			}
 		}
 	}
@@ -233,8 +229,7 @@ public final class Lynx {
 				jos.write(entry.getValue().array());
 			}
 		} catch (IOException e) {
-			System.err.println("Error writing classes to jar - please ensure this program has write permissions.");
-			throw new IOException(e);
+			throw new IOException("Error writing classes to jar - please ensure this program has write permissions.", e);
 		}
 	}
 

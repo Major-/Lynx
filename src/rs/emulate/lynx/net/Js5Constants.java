@@ -21,7 +21,7 @@ public final class Js5Constants {
 	/**
 	 * The major version (i.e. client version).
 	 */
-	public static final int MAJOR_VERSION = 816;
+	public static final int MAJOR_VERSION = 830;
 
 	/**
 	 * The minor version.
@@ -31,12 +31,13 @@ public final class Js5Constants {
 	/**
 	 * The host to connect to.
 	 */
-	public static final String HOST = "world1.runescape.com";
+	public static final String HOST = "world2.runescape.com";
 
 	/**
 	 * Default private constructor to prevent instantiation.
 	 */
 	private Js5Constants() {
+
 	}
 
 }
