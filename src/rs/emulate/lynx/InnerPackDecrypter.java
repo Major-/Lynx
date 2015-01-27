@@ -8,9 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
+import java.security.GeneralSecurityException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,10 +20,7 @@ import java.util.jar.Pack200;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 
-import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -90,28 +85,21 @@ public final class InnerPackDecrypter implements Closeable {
 	 * then returned as a {@link Map} of class names to byte buffers.
 	 * 
 	 * @return The map of class names to the byte buffers containing their data.
-	 * @throws NoSuchAlgorithmException If the current system does not have an AES implementation.
-	 * @throws NoSuchPaddingException If the current system does not support the specified padding scheme.
-	 * @throws InvalidKeyException If the secret key is invalid.
-	 * @throws InvalidAlgorithmParameterException If the initialisation vector is invalid.
+	 * @throws GeneralSecurityException If there is some sort of security error (e.g. can't find the algorithm, invalid
+	 *             initialisation vector, etc).
 	 * @throws IOException If there is an error reading from or writing to any of the various streams used.
-	 * @throws IllegalBlockSizeException If AES is unable to process the input data provided.
-	 * @throws BadPaddingException If the data lacks the appropriate padding bytes.
 	 */
-	public Map<String, ByteBuffer> decrypt() throws NoSuchAlgorithmException, NoSuchPaddingException,
-			InvalidKeyException, InvalidAlgorithmParameterException, IOException, IllegalBlockSizeException,
-			BadPaddingException {
+	public Map<String, ByteBuffer> decrypt() throws GeneralSecurityException, IOException {
 		int secretKeySize = getKeySize(encodedSecret.length());
 		int vectorSize = getKeySize(encodedVector.length());
 
-		byte[] secretKey = secretKeySize == 0 ? EMPTY_KEY : decodeBase64(encodedSecret, secretKeySize);
-		byte[] initialisationVector = vectorSize == 0 ? EMPTY_KEY : decodeBase64(encodedVector, vectorSize);
+		byte[] secretKey = (secretKeySize == 0) ? EMPTY_KEY : decodeBase64(encodedSecret, secretKeySize);
+		byte[] initialisationVector = (vectorSize == 0) ? EMPTY_KEY : decodeBase64(encodedVector, vectorSize);
 
 		Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 		SecretKeySpec secret = new SecretKeySpec(secretKey, "AES");
 		IvParameterSpec vector = new IvParameterSpec(initialisationVector);
 
-		// Initialise the cipher.
 		cipher.init(Cipher.DECRYPT_MODE, secret, vector);
 
 		byte[] buffer = new byte[LynxConstants.BUFFER_SIZE];
@@ -165,7 +153,7 @@ public final class InnerPackDecrypter implements Closeable {
 	 * @param size The size of the key, in bytes.
 	 * @return The key, as a byte array.
 	 */
-	private byte[] decodeBase64(String string, int size) {
+	private static byte[] decodeBase64(String string, int size) {
 		// JaGex's implementation uses * and - instead of + and /, so replace them.
 		String valid = string.replaceAll("\\*", "\\+").replaceAll("-", "/");
 
@@ -179,7 +167,7 @@ public final class InnerPackDecrypter implements Closeable {
 	 * @param length The length of the string.
 	 * @return The key size.
 	 */
-	private int getKeySize(int length) {
+	private static int getKeySize(int length) {
 		if (length == 0) {
 			return 0;
 		}
