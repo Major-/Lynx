@@ -12,11 +12,11 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.jar.JarOutputStream;
+import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 
 import rs.emulate.lynx.net.ClientVersionWorker;
@@ -30,8 +30,14 @@ import rs.emulate.lynx.net.Js5Constants;
  */
 public final class Lynx {
 
+	/**
+	 * The logger for this class.
+	 */
+	private static final Logger logger = Logger.getLogger(Lynx.class.getSimpleName());
+
 	static {
 		try {
+			logger.fine("Creating directories: " + LynxConstants.SAVE_DIRECTORY);
 			Files.createDirectories(LynxConstants.SAVE_DIRECTORY);
 		} catch (IOException e) {
 			throw new ExceptionInInitializerError("Could not create directories: " + e.getMessage());
@@ -45,6 +51,7 @@ public final class Lynx {
 	 */
 	public static void main(String[] args) {
 		boolean identifyVersion = (args.length == 0 || !args[0].equals("--noversion"));
+		logger.fine("Starting lynx with" + (identifyVersion ? " " : "out ") + " version identification.");
 		Lynx lynx = new Lynx(identifyVersion);
 
 		try {
@@ -71,13 +78,13 @@ public final class Lynx {
 		Path gamepack = directory.resolve("gamepack.jar");
 
 		try (InputStream is = new BufferedInputStream(url.openStream());
-				OutputStream os = new BufferedOutputStream(Files.newOutputStream(gamepack, StandardOpenOption.CREATE))) {
+				OutputStream os = new BufferedOutputStream(Files.newOutputStream(gamepack, StandardOpenOption.TRUNCATE_EXISTING,
+						StandardOpenOption.CREATE))) {
 
 			int read;
 			while ((read = is.read()) != -1) {
 				os.write(read);
 			}
-
 		} catch (IOException e) {
 			throw new IOException("Error retrieving gamepack - please report.", e);
 		}
@@ -93,7 +100,7 @@ public final class Lynx {
 	 * @throws IllegalStateException If the map of parameters does not contain the connection key.
 	 */
 	private static String getConnectionKey(Map<String, String> parameters) {
-		return parameters.values().stream().filter(value -> value.length() == 32).findFirst()
+		return parameters.values().stream().filter(value -> value.length() == 32).findAny()
 				.orElseThrow(() -> new IllegalStateException("Parameters did not contain the connection key - please report."));
 	}
 
@@ -109,8 +116,8 @@ public final class Lynx {
 			worker.connect(Js5Constants.MAJOR_VERSION, Js5Constants.MINOR_VERSION);
 
 			return worker.identifyVersion();
-		} catch (IOException e) {
-			throw new IOException("Error identifying the correct version - please report.", e);
+		} catch (Exception e) {
+			throw new IllegalStateException("Error identifying the correct version - please report.", e);
 		}
 	}
 
@@ -133,8 +140,9 @@ public final class Lynx {
 			try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE)) {
 				ByteBuffer buffer = entry.getValue();
 				channel.write(buffer);
-			} catch (IOException e) {
-				throw new IOException("Error writing classes to file - please ensure this program has write permissions.", e);
+			} catch (Exception e) {
+				throw new IllegalStateException(
+						"Error writing classes to file - please ensure this program has write permissions.", e);
 			}
 		}
 	}
@@ -157,8 +165,8 @@ public final class Lynx {
 				jos.putNextEntry(zip);
 				jos.write(entry.getValue().array());
 			}
-		} catch (IOException e) {
-			throw new IOException("Error writing classes to jar - please ensure this program has write permissions.", e);
+		} catch (Exception e) {
+			throw new IllegalStateException("Error writing classes to jar - please ensure this program has write permissions.", e);
 		}
 	}
 
@@ -184,8 +192,11 @@ public final class Lynx {
 	private void run() throws IOException {
 		long start = System.currentTimeMillis();
 
+		logger.fine("Creating a Crawler for the URL " + (LynxConstants.APPLET_URL + ",j0"));
 		Crawler crawler = new Crawler(new URL(LynxConstants.APPLET_URL + ",j0"));
 		Map<String, String> parameters = crawler.fetchParameters();
+
+		logger.fine("Fetched parameters: " + parameters);
 
 		if (!parameters.containsKey("gamepack")) {
 			throw new IllegalStateException("Failed to parse parameters (no gamepack found) - please report.");
@@ -193,7 +204,7 @@ public final class Lynx {
 
 		System.out.println("Successfully fetched parameters.");
 
-		String suffix = Instant.now().toString();
+		String suffix = Instant.now().toString().replace(':', '.');
 		if (identifyVersion) {
 			String key = getConnectionKey(parameters);
 			int version = identifyVersion(key);
@@ -205,10 +216,16 @@ public final class Lynx {
 		Files.createDirectories(directory);
 
 		URL url = new URL(LynxConstants.APPLET_URL + parameters.get("gamepack"));
+		logger.fine("Downloading gamepack from " + LynxConstants.APPLET_URL + parameters.get("gamepack"));
+
 		Path gamepack = downloadGamepack(url, directory);
+		logger.fine("Saving gamepack to " + gamepack + ".");
 
 		String secret = parameters.get(LynxConstants.SECRET_PARAMETER_NAME);
 		String vector = parameters.get(LynxConstants.VECTOR_PARAMETER_NAME);
+
+		logger.fine("Secret parameter: " + secret);
+		logger.fine("Vector parameter: " + vector);
 
 		if (secret == null || vector == null) {
 			throw new IllegalStateException("Failed to identify an AES parameter - please report.");
@@ -218,7 +235,7 @@ public final class Lynx {
 
 		try (InnerPackDecrypter decrypter = new InnerPackDecrypter(gamepack, secret, vector)) {
 			classes = decrypter.decrypt();
-		} catch (GeneralSecurityException e) {
+		} catch (Exception e) {
 			throw new IllegalStateException("Error decrypting the inner archive - please report.", e);
 		}
 

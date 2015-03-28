@@ -46,7 +46,7 @@ public final class LynxConstants {
 	public static final String VECTOR_PARAMETER_NAME = "-1";
 
 	/**
-	 * No-args private constructor to prevent instantiation.
+	 * Sole private constructor to prevent instantiation.
 	 */
 	private LynxConstants() {
 
