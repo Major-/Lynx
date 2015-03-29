@@ -11,16 +11,6 @@ import java.nio.file.Paths;
 public final class LynxConstants {
 
 	/**
-	 * The id of the world the applet should use.
-	 */
-	public static final int APPLET_ID = 2;
-
-	/**
-	 * The URL to the page containing the game applet.
-	 */
-	public static final String APPLET_URL = "http://world" + APPLET_ID + ".runescape.com/g=runescape/";
-
-	/**
 	 * The size of the buffer used when decrypting the {@code inner.pack.gz} archive, in bytes.
 	 */
 	public static final int BUFFER_SIZE = 5 * 1024 * 1024;
@@ -29,6 +19,11 @@ public final class LynxConstants {
 	 * The name of the archive containing the client.
 	 */
 	public static final String ENCRYPTED_ARCHIVE_NAME = "inner.pack.gz";
+
+	/**
+	 * The protocol to use when downloading the gamepack.
+	 */
+	public static final String PROTOCOL = "http://";
 
 	/**
 	 * The path to the directory to save data in.
@@ -44,6 +39,11 @@ public final class LynxConstants {
 	 * The parameter name for the encoded AES initialisation vector.
 	 */
 	public static final String VECTOR_PARAMETER_NAME = "-1";
+
+	/**
+	 * The id of the world the applet should use.
+	 */
+	public static final int WORLD_ID = 2;
 
 	/**
 	 * Sole private constructor to prevent instantiation.

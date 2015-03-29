@@ -19,6 +19,9 @@ import java.util.jar.JarOutputStream;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 
+import rs.emulate.lynx.args.ArgumentParser;
+import rs.emulate.lynx.args.Arguments;
+import rs.emulate.lynx.args.ClientSource;
 import rs.emulate.lynx.net.ClientVersionWorker;
 import rs.emulate.lynx.net.Crawler;
 import rs.emulate.lynx.net.Js5Constants;
@@ -50,9 +53,16 @@ public final class Lynx {
 	 * @param args The program arguments.
 	 */
 	public static void main(String[] args) {
-		boolean identifyVersion = (args.length == 0 || !args[0].equals("--noversion"));
-		logger.fine("Starting lynx with" + (identifyVersion ? " " : "out ") + " version identification.");
-		Lynx lynx = new Lynx(identifyVersion);
+		ArgumentParser parser = new ArgumentParser(args);
+		try {
+			parser.parse();
+		} catch (IllegalArgumentException e) {
+			System.err.println(e.getMessage() + "\n");
+			parser.printHelpText();
+			System.exit(1);
+		}
+
+		Lynx lynx = new Lynx(parser.getOrDefault(Arguments.IDENTIFY_VERSION), parser.getOrDefault(Arguments.GAMEPACK_SOURCE));
 
 		try {
 			lynx.run();
@@ -74,8 +84,10 @@ public final class Lynx {
 	 * @return The path to the {@code gamepack} file.
 	 * @throws IOException If there is an error downloading the {@code gamepack} file.
 	 */
-	private static Path downloadGamepack(URL url, Path directory) throws IOException {
-		Path gamepack = directory.resolve("gamepack.jar");
+	private Path downloadGamepack(URL url, Path directory) throws IOException {
+		String name = source.isEncrypted() ? "gamepack.jar" : "client.jar";
+		Path gamepack = directory.resolve(name);
+		System.out.println("Downloading " + source.getPrettyName() + " " + name + " to " + directory);
 
 		try (InputStream is = new BufferedInputStream(url.openStream());
 				OutputStream os = new BufferedOutputStream(Files.newOutputStream(gamepack, StandardOpenOption.TRUNCATE_EXISTING,
@@ -86,7 +98,7 @@ public final class Lynx {
 				os.write(read);
 			}
 		} catch (IOException e) {
-			throw new IOException("Error retrieving gamepack - please report.", e);
+			throw new IOException("Error retrieving " + name + " - please report.", e);
 		}
 
 		return gamepack;
@@ -176,12 +188,19 @@ public final class Lynx {
 	private final boolean identifyVersion;
 
 	/**
-	 * Creates the new lynx object.
+	 * The GamepackSource to download the gamepack from.
+	 */
+	private final ClientSource source;
+
+	/**
+	 * Creates Lynx.
 	 * 
 	 * @param identifyVersion Whether or not the current client version should be identified.
+	 * @param source The {@link ClientSource} to download the gamepack from.
 	 */
-	public Lynx(boolean identifyVersion) {
+	public Lynx(boolean identifyVersion, ClientSource source) {
 		this.identifyVersion = identifyVersion;
+		this.source = source;
 	}
 
 	/**
@@ -192,8 +211,10 @@ public final class Lynx {
 	private void run() throws IOException {
 		long start = System.currentTimeMillis();
 
-		logger.fine("Creating a Crawler for the URL " + (LynxConstants.APPLET_URL + ",j0"));
-		Crawler crawler = new Crawler(new URL(LynxConstants.APPLET_URL + ",j0"));
+		String path = source.forCrawler(LynxConstants.PROTOCOL, LynxConstants.WORLD_ID);
+
+		logger.fine("Creating a Crawler for the URL " + path);
+		Crawler crawler = new Crawler(new URL(path));
 		Map<String, String> parameters = crawler.fetchParameters();
 
 		logger.fine("Fetched parameters: " + parameters);
@@ -204,8 +225,8 @@ public final class Lynx {
 
 		System.out.println("Successfully fetched parameters.");
 
-		String suffix = Instant.now().toString().replace(':', '.');
-		if (identifyVersion) {
+		String suffix = source.name() + Instant.now().toString().replace(':', '.');
+		if (source == ClientSource.RUNESCAPE && identifyVersion) {
 			String key = getConnectionKey(parameters);
 			int version = identifyVersion(key);
 
@@ -215,37 +236,40 @@ public final class Lynx {
 		Path directory = LynxConstants.SAVE_DIRECTORY.resolve(suffix);
 		Files.createDirectories(directory);
 
-		URL url = new URL(LynxConstants.APPLET_URL + parameters.get("gamepack"));
-		logger.fine("Downloading gamepack from " + LynxConstants.APPLET_URL + parameters.get("gamepack"));
+		path = source.forClient(LynxConstants.PROTOCOL, LynxConstants.WORLD_ID);
+		URL url = new URL(path + parameters.get("gamepack"));
+		logger.fine("Downloading gamepack from " + path + parameters.get("gamepack"));
 
 		Path gamepack = downloadGamepack(url, directory);
 		logger.fine("Saving gamepack to " + gamepack + ".");
 
-		String secret = parameters.get(LynxConstants.SECRET_PARAMETER_NAME);
-		String vector = parameters.get(LynxConstants.VECTOR_PARAMETER_NAME);
+		if (source.isEncrypted()) {
+			String secret = parameters.get(LynxConstants.SECRET_PARAMETER_NAME);
+			String vector = parameters.get(LynxConstants.VECTOR_PARAMETER_NAME);
 
-		logger.fine("Secret parameter: " + secret);
-		logger.fine("Vector parameter: " + vector);
+			logger.fine("Secret parameter: " + secret);
+			logger.fine("Vector parameter: " + vector);
 
-		if (secret == null || vector == null) {
-			throw new IllegalStateException("Failed to identify an AES parameter - please report.");
+			if (secret == null || vector == null) {
+				throw new IllegalStateException("Failed to identify an AES parameter - please report.");
+			}
+
+			Map<String, ByteBuffer> classes;
+
+			try (InnerPackDecrypter decrypter = new InnerPackDecrypter(gamepack, secret, vector)) {
+				classes = decrypter.decrypt();
+			} catch (Exception e) {
+				throw new IllegalStateException("Error decrypting the inner archive - please report.", e);
+			}
+
+			Path client = directory.resolve("bin");
+			Files.createDirectories(client);
+
+			System.out.println("Writing class files.");
+
+			writeJar(classes, directory, "client.jar");
+			writeClasses(classes, client);
 		}
-
-		Map<String, ByteBuffer> classes;
-
-		try (InnerPackDecrypter decrypter = new InnerPackDecrypter(gamepack, secret, vector)) {
-			classes = decrypter.decrypt();
-		} catch (Exception e) {
-			throw new IllegalStateException("Error decrypting the inner archive - please report.", e);
-		}
-
-		Path client = directory.resolve("bin");
-		Files.createDirectories(client);
-
-		System.out.println("Writing class files.");
-
-		writeJar(classes, directory, "client.jar");
-		writeClasses(classes, client);
 
 		System.out.println("Done, took " + (System.currentTimeMillis() - start) / 1_000 + " seconds.");
 	}

@@ -23,7 +23,7 @@ public final class Crawler {
 	/**
 	 * The pattern used to match the gamepack archive location.
 	 */
-	private static final Pattern ARCHIVE_PATTERN = Pattern.compile("(?<=archive=)(.*)(?= )");
+	private static final Pattern ARCHIVE_PATTERN = Pattern.compile("(?<=archive=)([^ ]+)(?= )");
 
 	/**
 	 * The pattern used to patch parameter names.
@@ -91,8 +91,9 @@ public final class Crawler {
 	private static void parseParameter(String parameter, Map<String, String> parameters) {
 		Matcher matcher = NAME_PATTERN.matcher(parameter);
 		if (!matcher.find()) {
-			throw new IllegalStateException("Found parameter " + parameter + " with no name pattern - please report.");
+			return;
 		}
+		
 		String name = matcher.group(1).trim();
 
 		matcher = VALUE_PATTERN.matcher(parameter);
