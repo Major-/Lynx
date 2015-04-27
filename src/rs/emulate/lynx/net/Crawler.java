@@ -57,13 +57,14 @@ public final class Crawler {
 	/**
 	 * Gets the parameters matching the pre-defined patterns, returning them as a {@link Map} of names to values.
 	 * 
+	 * @param page The {@link List} of Strings that make up the web page.
 	 * @return The map of parameters.
 	 * @throws IOException If there was an error reading from the {@link URL}.
 	 */
-	public Map<String, String> fetchParameters() throws IOException {
+	public Map<String, String> fetchParameters(List<String> page) throws IOException {
 		Map<String, String> parameters = new HashMap<>();
 
-		for (String string : readPage()) {
+		for (String string : page) {
 			Matcher matcher = ARCHIVE_PATTERN.matcher(string);
 
 			if (matcher.find()) {
@@ -83,35 +84,12 @@ public final class Crawler {
 	}
 
 	/**
-	 * Parses a single parameter into its name and value, and adds it to the {@link Map}.
-	 * 
-	 * @param parameter The string containing the parameter.
-	 * @param parameters The map of parameter names to values.
-	 */
-	private static void parseParameter(String parameter, Map<String, String> parameters) {
-		Matcher matcher = NAME_PATTERN.matcher(parameter);
-		if (!matcher.find()) {
-			return;
-		}
-		
-		String name = matcher.group(1).trim();
-
-		matcher = VALUE_PATTERN.matcher(parameter);
-		if (!matcher.find()) {
-			throw new IllegalStateException("Found parameter " + parameter + " with no value pattern - please report.");
-		}
-
-		String value = matcher.group(1).trim();
-		parameters.put(name, value);
-	}
-
-	/**
 	 * Reads the page, returning it as a {@link List} of strings (one string per line).
 	 * 
 	 * @return The list of strings.
 	 * @throws IOException If there was an error reading from the {@link URL}.
 	 */
-	private List<String> readPage() throws IOException {
+	public List<String> readPage() throws IOException {
 		List<String> lines = new ArrayList<>();
 
 		try (InputStream is = new BufferedInputStream(url.openStream());
@@ -123,6 +101,29 @@ public final class Crawler {
 		}
 
 		return lines;
+	}
+
+	/**
+	 * Parses a single parameter into its name and value, and adds it to the {@link Map}.
+	 * 
+	 * @param parameter The string containing the parameter.
+	 * @param parameters The map of parameter names to values.
+	 */
+	private void parseParameter(String parameter, Map<String, String> parameters) {
+		Matcher matcher = NAME_PATTERN.matcher(parameter);
+		if (!matcher.find()) {
+			return;
+		}
+
+		String name = matcher.group(1).trim();
+
+		matcher = VALUE_PATTERN.matcher(parameter);
+		if (!matcher.find()) {
+			throw new IllegalStateException("Found parameter " + parameter + " with no value pattern - please report.");
+		}
+
+		String value = matcher.group(1).trim();
+		parameters.put(name, value);
 	}
 
 }

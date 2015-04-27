@@ -2,6 +2,7 @@ package rs.emulate.lynx;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -13,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.jar.JarOutputStream;
@@ -215,7 +217,8 @@ public final class Lynx {
 
 		logger.fine("Creating a Crawler for the URL " + path);
 		Crawler crawler = new Crawler(new URL(path));
-		Map<String, String> parameters = crawler.fetchParameters();
+		List<String> page = crawler.readPage();
+		Map<String, String> parameters = crawler.fetchParameters(page);
 
 		logger.fine("Fetched parameters: " + parameters);
 
@@ -225,16 +228,11 @@ public final class Lynx {
 
 		System.out.println("Successfully fetched parameters.");
 
-		String suffix = source.name() + Instant.now().toString().replace(':', '.');
-		if (source == ClientSource.RUNESCAPE && identifyVersion) {
-			String key = getConnectionKey(parameters);
-			int version = identifyVersion(key);
-
-			suffix = Integer.toString(version);
-		}
-
+		String suffix = getDirectorySuffix(parameters);
 		Path directory = LynxConstants.SAVE_DIRECTORY.resolve(suffix);
 		Files.createDirectories(directory);
+		
+		savePage(page, directory);
 
 		path = source.forClient(LynxConstants.PROTOCOL, LynxConstants.WORLD_ID);
 		URL url = new URL(path + parameters.get("gamepack"));
@@ -272,6 +270,43 @@ public final class Lynx {
 		}
 
 		System.out.println("Done, took " + (System.currentTimeMillis() - start) / 1_000 + " seconds.");
+	}
+
+	/**
+	 * Saves the {@link List} of Strings to the {@code params.txt} file in the directory represented by the specified
+	 * {@link Path}.
+	 * 
+	 * @param page The List of Strings.
+	 * @param directory The Path representing the directory to save the file in.
+	 * @throws IOException If there is an error writing to the file.
+	 */
+	private void savePage(List<String> page, Path directory) throws IOException {
+		Path file = directory.resolve("params.txt");
+
+		try (BufferedWriter writer = Files.newBufferedWriter(file)) {
+			for (String line : page) {
+				writer.write(line);
+				writer.newLine();
+			}
+		}
+	}
+
+	/**
+	 * Gets the suffix for the directory name.
+	 * 
+	 * @param parameters The {@link Map} of parameters.
+	 * @return The suffix for the directory.
+	 * @throws IOException If there is an error identifying the client version.
+	 */
+	private String getDirectorySuffix(Map<String, String> parameters) throws IOException {
+		if (source == ClientSource.RUNESCAPE && identifyVersion) {
+			String key = getConnectionKey(parameters);
+			int version = identifyVersion(key);
+
+			return Integer.toString(version);
+		}
+
+		return source.name() + Instant.now().toString().replace(':', '.');
 	}
 
 }

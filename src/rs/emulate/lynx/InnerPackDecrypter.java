@@ -80,21 +80,17 @@ public final class InnerPackDecrypter implements Closeable {
 	}
 
 	/**
-	 * Decrypts the {@code inner.pack.gz} archive using the AES cipher. The decrypted data is then un-gzipped and
+	 * Decrypts the {@code inner.pack.gz} archive using the AES cipher. The decrypted data is then de-gzipped and
 	 * unpacked from the pack200 format, before finally being split into a {@link ByteBuffer} per class. The data is
 	 * then returned as a {@link Map} of class names to byte buffers.
 	 * 
-	 * @return The map of class names to the byte buffers containing their data.
-	 * @throws GeneralSecurityException If there is some sort of security error (e.g. can't find the algorithm, invalid
-	 *             initialisation vector, etc).
+	 * @return The Map of Class names to the ByteBuffers containing their data.
+	 * @throws GeneralSecurityException If there is some sort of security error.
 	 * @throws IOException If there is an error reading from or writing to any of the various streams used.
 	 */
 	public Map<String, ByteBuffer> decrypt() throws GeneralSecurityException, IOException {
-		int secretKeySize = getKeySize(encodedSecret.length());
-		int vectorSize = getKeySize(encodedVector.length());
-
-		byte[] secretKey = (secretKeySize == 0) ? EMPTY_KEY : decodeBase64(encodedSecret, secretKeySize);
-		byte[] initialisationVector = (vectorSize == 0) ? EMPTY_KEY : decodeBase64(encodedVector, vectorSize);
+		byte[] secretKey = (encodedSecret.length() == 0) ? EMPTY_KEY : decodeBase64(encodedSecret);
+		byte[] initialisationVector = (encodedVector.length() == 0) ? EMPTY_KEY : decodeBase64(encodedVector);
 
 		Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 		SecretKeySpec secret = new SecretKeySpec(secretKey, "AES");
@@ -111,21 +107,18 @@ public final class InnerPackDecrypter implements Closeable {
 
 		System.out.println("Decrypting the archive.");
 
-		// Decrypt the inner.pack.gz file.
 		byte[] decrypted = cipher.doFinal(buffer, 0, read);
 		ByteArrayOutputStream bos = new ByteArrayOutputStream(LynxConstants.BUFFER_SIZE);
 
-		// Un-gzip and unpack the jar file contained in the archive, and write the decompressed data out.
-		try (JarOutputStream jos = new JarOutputStream(bos);
+		try (JarOutputStream jar = new JarOutputStream(bos);
 				GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(decrypted))) {
-			Pack200.newUnpacker().unpack(gzip, jos);
+			Pack200.newUnpacker().unpack(gzip, jar);
 		}
 
 		Map<String, ByteBuffer> classes = new HashMap<>();
 
-		// Iterate through the jar entries from the stream, read and wrap them, and add them to the map.
-		try (JarInputStream jis = new JarInputStream(new ByteArrayInputStream(bos.toByteArray()))) {
-			for (JarEntry entry = jis.getNextJarEntry(); entry != null; entry = jis.getNextJarEntry()) {
+		try (JarInputStream jar = new JarInputStream(new ByteArrayInputStream(bos.toByteArray()))) {
+			for (JarEntry entry = jar.getNextJarEntry(); entry != null; entry = jar.getNextJarEntry()) {
 				String name = entry.getName();
 				if (!name.endsWith(".class")) {
 					System.out.println(name);
@@ -133,7 +126,7 @@ public final class InnerPackDecrypter implements Closeable {
 				}
 
 				read = in = 0;
-				while (read < buffer.length && (in = jis.read(buffer, read, buffer.length - read)) != -1) {
+				while (read < buffer.length && (in = jar.read(buffer, read, buffer.length - read)) != -1) {
 					read += in;
 				}
 
@@ -148,31 +141,20 @@ public final class InnerPackDecrypter implements Closeable {
 
 	/**
 	 * Decodes the base64 string into a valid secret key or initialisation vector.
+	 * <p>
+	 * Jagex use a slightly different variant of base 64, where '+' and '/' are replaced with '*' and '-', so we replace
+	 * those before passing it to the decoder. This is similar to the <a
+	 * href="https://tools.ietf.org/html/rfc4648#page-7">Base 64 Encoding with URL and Filename Safe Alphabet</a>
+	 * variant of Base 64 (but uses '*' in place of '_').
 	 * 
-	 * @param string The string.
-	 * @param size The size of the key, in bytes.
+	 * @param string The String to decode.
 	 * @return The key, as a byte array.
 	 */
-	private static byte[] decodeBase64(String string, int size) {
-		// JaGex's implementation uses * and - instead of + and /, so replace them.
-		String valid = string.replaceAll("\\*", "\\+").replaceAll("-", "/");
+	private byte[] decodeBase64(String string) {
+		String valid = string.replace('*', '+').replace('-', '/');
 
 		Base64.Decoder base64 = Base64.getDecoder();
 		return base64.decode(valid);
-	}
-
-	/**
-	 * Gets the key size for a string of the specified length.
-	 * 
-	 * @param length The length of the string.
-	 * @return The key size.
-	 */
-	private static int getKeySize(int length) {
-		if (length == 0) {
-			return 0;
-		}
-
-		return 3 * (int) Math.floor((length - 1) / 4) + 1;
 	}
 
 }
