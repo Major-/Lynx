@@ -31,7 +31,7 @@ public final class Js5Constants {
 	/**
 	 * The host to connect to.
 	 */
-	public static final String HOST = "world2.runescape.com";
+	public static final String HOST = "content.runescape.com";
 
 	/**
 	 * Sole private constructor to prevent instantiation.
