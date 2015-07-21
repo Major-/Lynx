@@ -223,13 +223,25 @@ public final class ClientVersionWorker implements Closeable {
 	 * @throws IOException If there is an error writing to the output stream.
 	 */
 	private void init() throws IOException {
-		ByteBuffer buffer = ByteBuffer.allocate(43);
+		ByteBuffer buffer = ByteBuffer.allocate(44);
 		buffer.put((byte) 15); // handshake type
-		buffer.put((byte) 41); // size
+		buffer.put((byte) 42); // size
 		buffer.putInt(major);
 		buffer.putInt(minor);
 		buffer.put(key.getBytes());
 		buffer.put((byte) 0); // string terminator
+		buffer.put((byte) 0); // language id
+		
+		/*
+				0 = English
+				1 = German
+				2 = French
+				3 = Portuguese
+				4 = Dutch
+				5 = Spanish
+				6 = Spanish (Latin America)
+		*/
+		
 		output.write(buffer.array());
 		output.flush();
 
